@@ -1,4 +1,5 @@
-const { randomUUID } = require("crypto");
+const { createHmac, randomUUID, timingSafeEqual } = require("crypto");
+const { loadLocalEnv } = require("./config");
 const { createRequestError, getCurrentTimestamp } = require("./data/shared");
 
 const demoUsers = [
@@ -26,6 +27,8 @@ const demoUsers = [
 ];
 
 const sessions = new Map();
+const revokedTokens = new Set();
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 
 function sanitizeUser(user) {
   return {
@@ -44,13 +47,103 @@ function findUserByCredentials(username, password) {
   );
 }
 
-function createSession(user) {
-  const token = randomUUID();
-  const session = {
-    token: token,
+function getSessionSecret() {
+  loadLocalEnv();
+
+  return process.env.AUTH_SESSION_SECRET || "restaurant-management-session-secret";
+}
+
+function encodeBase64Url(value) {
+  return Buffer.from(String(value || ""), "utf8")
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function decodeBase64Url(value) {
+  const normalized = String(value || "")
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+  const remainder = normalized.length % 4;
+  const padded = remainder === 0 ? normalized : normalized + "=".repeat(4 - remainder);
+
+  return Buffer.from(padded, "base64").toString("utf8");
+}
+
+function signEncodedPayload(encodedPayload) {
+  return createHmac("sha256", getSessionSecret()).update(encodedPayload).digest("hex");
+}
+
+function compareSignatures(a, b) {
+  const first = Buffer.from(String(a || ""), "utf8");
+  const second = Buffer.from(String(b || ""), "utf8");
+
+  return first.length === second.length && timingSafeEqual(first, second);
+}
+
+function isExpired(expiresAt) {
+  const expiresAtValue = Date.parse(String(expiresAt || ""));
+
+  return Number.isNaN(expiresAtValue) || expiresAtValue <= Date.now();
+}
+
+function createSignedToken(user) {
+  const payload = {
+    jti: randomUUID(),
     user: sanitizeUser(user),
-    createdAt: getCurrentTimestamp()
+    createdAt: getCurrentTimestamp(),
+    expiresAt: new Date(Date.now() + SESSION_TTL_MS).toISOString()
   };
+  const encodedPayload = encodeBase64Url(JSON.stringify(payload));
+
+  return encodedPayload + "." + signEncodedPayload(encodedPayload);
+}
+
+function verifySignedToken(token) {
+  if (!token || revokedTokens.has(token)) {
+    return null;
+  }
+
+  const segments = String(token).split(".");
+
+  if (segments.length !== 2) {
+    return null;
+  }
+
+  const encodedPayload = segments[0];
+  const signature = segments[1];
+  const expectedSignature = signEncodedPayload(encodedPayload);
+
+  if (!compareSignatures(signature, expectedSignature)) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(decodeBase64Url(encodedPayload));
+
+    if (!payload || !payload.user || isExpired(payload.expiresAt)) {
+      return null;
+    }
+
+    return {
+      token: token,
+      user: payload.user,
+      createdAt: payload.createdAt || getCurrentTimestamp(),
+      expiresAt: payload.expiresAt
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+function createSession(user) {
+  const token = createSignedToken(user);
+  const session = verifySignedToken(token);
+
+  if (!session) {
+    throw createRequestError(500, "Could not create the staff session.");
+  }
 
   sessions.set(token, session);
   return session;
@@ -62,6 +155,7 @@ function deleteSession(token) {
   }
 
   sessions.delete(token);
+  revokedTokens.add(token);
 }
 
 function getAccessToken(request) {
@@ -81,7 +175,24 @@ function getSessionFromRequest(request) {
     return null;
   }
 
-  return sessions.get(token) || null;
+  const cachedSession = sessions.get(token);
+
+  if (cachedSession) {
+    if (isExpired(cachedSession.expiresAt)) {
+      sessions.delete(token);
+      revokedTokens.delete(token);
+    } else {
+      return cachedSession;
+    }
+  }
+
+  const session = verifySignedToken(token);
+
+  if (session) {
+    sessions.set(token, session);
+  }
+
+  return session;
 }
 
 function requireUser(request, allowedRoles) {

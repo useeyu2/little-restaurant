@@ -31,6 +31,8 @@ Then open `http://localhost:3001`.
 
 The API loads local configuration from `.env.local` or `.env`. Use [.env.example](c:/Users/User 1/Desktop/useenlittle/vscode/restaurant system/.env.example) as the template for MongoDB settings.
 
+For production or any serverless host, set `AUTH_SESSION_SECRET` to a long random value so staff login tokens stay valid across instances.
+
 For Cloudinary uploads, set either `CLOUDINARY_URL` or the individual `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` values.
 
 For Brevo email alerts, set `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, and `BREVO_ALERT_RECIPIENTS`.
@@ -44,6 +46,7 @@ The project includes [vercel.json](c:\Users\User 1\Desktop\useenlittle\vscode\re
 Set these production environment variables in Vercel before the first deployment:
 
 - `STORE_DRIVER=mongodb`
+- `AUTH_SESSION_SECRET`
 - `MONGODB_URI`
 - `MONGODB_DB_NAME`
 - `CLOUDINARY_URL` or the individual Cloudinary credentials
