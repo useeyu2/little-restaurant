@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Restaurant Management System</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Restaurant Management System</p>
+          <h1 id="restaurant-name">Loading operations dashboard...</h1>
+          <p class="subcopy" id="restaurant-context">
+            Pulling live floor, kitchen, and stock data.
+          </p>
+        </div>
+        <div class="hero-panel">
+          <p class="hero-label">Phase 1 focus</p>
+          <p class="hero-value">Front-of-house and kitchen control room</p>
+        </div>
+      </header>
+
+      <main id="app" class="dashboard-grid" aria-live="polite"></main>
+    </div>
+
+    <script src="/src/app.js"></script>
+  </body>
+</html>
+
