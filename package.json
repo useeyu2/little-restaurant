@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node apps/api/src/server.js",
     "dev": "node apps/api/src/server.js",
+    "build": "node -e \"console.log('No build step required.')\"",
     "check": "node --check apps/api/src/server.js && node --check apps/api/src/createServer.js && node --check apps/api/src/config.js && node --check apps/api/src/routes.js && node --check apps/api/src/services/cloudinaryService.js && node --check apps/api/src/services/notificationService.js && node --check apps/api/src/data/shared.js && node --check apps/api/src/data/memoryStore.js && node --check apps/api/src/data/mongoStore.js && node --check apps/api/src/data/store.js && node --check apps/web/src/app.js && node --check api/index.js",
     "test": "node apps/api/src/test/routes.test.js"
   },
